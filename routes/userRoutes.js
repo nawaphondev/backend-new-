@@ -108,4 +108,7 @@ router.use((err, req, res, next) => {
 // Delete User
 router.delete("/:id", authenticateToken, userController.deleteUser);
 
+// Get Current User
+router.get('/me', authenticateToken, userController.getCurrentUser);
+
 module.exports = router;

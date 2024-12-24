@@ -12,20 +12,20 @@ const upload = multer({ storage: storage });
 exports.loginUser = async (req, res) => {
   const { usernameOrEmail, password } = req.body;
 
-  const query = "SELECT id, username, user_level, password FROM users WHERE username = ? OR email = ? LIMIT 1";
+  const query =
+    "SELECT id, username, user_level, password FROM users WHERE username = ? OR email = ? LIMIT 1";
   db.query(query, [usernameOrEmail, usernameOrEmail], async (err, results) => {
     if (err) return res.status(500).json({ error: "Database error" });
-    if (results.length === 0) return res.status(404).json({ error: "User not found" });
+    if (results.length === 0)
+      return res.status(404).json({ error: "User not found" });
 
     const user = results[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
 
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
     res.json({ token });
   });
 };
@@ -84,7 +84,6 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-
 // Create a new user (Admin or Super User only)
 exports.createUser = async (req, res) => {
   const { username, email, password, user_level, status } = req.body;
@@ -118,17 +117,16 @@ exports.createUser = async (req, res) => {
   }
 };
 
-
 // Forgot password (send reset email to Admin)
 exports.forgotPassword = (req, res) => {
   const { email } = req.body;
-  
+
   const query = "SELECT * FROM users WHERE email = ?";
   db.query(query, [email], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     if (results.length === 0)
       return res.status(404).json({ error: "Email not found" });
-    
+
     const user = results[0];
     sendResetEmail(user.email);
     res.json({ message: "Password reset request sent to Admin." });
@@ -144,14 +142,14 @@ const sendResetEmail = (userEmail) => {
       pass: process.env.MAIL_PASS,
     },
   });
-  
+
   const mailOptions = {
     from: process.env.MAIL_USER,
     to: "admin@example.com",
     subject: "Password Reset Request",
     text: `User with email ${userEmail} has requested a password reset.`,
   };
-  
+
   transporter.sendMail(mailOptions, (err, info) => {
     if (err) {
       console.log("Error sending email:", err);
@@ -162,49 +160,15 @@ const sendResetEmail = (userEmail) => {
 };
 
 exports.getCurrentUser = (req, res) => {
-  try {
-    const userId = req.user.userId; // Extract user ID from JWT
-    const query =
-    "SELECT id, username, email, profile_picture FROM users WHERE id = ?";
-    
-    db.query(query, [userId], (err, results) => {
-      if (err) {
-        console.error("Database Error:", err);
-        return res.status(500).json({ error: "Database error occurred" });
-      }
+  const userId = req.user.userId; // ดึง ID ผู้ใช้จาก JWT
 
-      if (results.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      
-      const user = results[0];
-      
-      // Convert profile_picture from Buffer to Base64
-      const profilePictureBase64 = user.profile_picture
-      ? `data:image/jpeg;base64,${user.profile_picture.toString("base64")}`
-        : null;
-        
-        res.json({
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          profilePicture: profilePictureBase64,
-        });
-      });
-    } catch (error) {
-      console.error("Unexpected Error in Controller:", error.message);
-      res.status(500).json({ error: "Unexpected error occurred" });
-    }
-  };
-  
-  // Read a user by ID
-  exports.readUser = (req, res) => {
-    const userId = req.params.id;
-    const query =
-    "SELECT id, username, email, profile_picture, user_level, status FROM users WHERE id = ?";
-    
-    db.query(query, [userId], (err, results) => {
-      if (err) {
+  const query = `
+    SELECT id, username, email, profile_picture 
+    FROM users 
+    WHERE id = ?`;
+
+  db.query(query, [userId], (err, results) => {
+    if (err) {
       console.error("Database Error:", err);
       return res.status(500).json({ error: "Database error occurred" });
     }
@@ -212,13 +176,44 @@ exports.getCurrentUser = (req, res) => {
     if (results.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
-    
+
     const user = results[0];
-    
+    const profilePicture = user.profile_picture
+      ? `data:image/jpeg;base64,${user.profile_picture.toString("base64")}`
+      : null;
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      profile_picture: profilePicture
+    });
+  });
+};
+
+
+// Read a user by ID
+exports.readUser = (req, res) => {
+  const userId = req.params.id;
+  const query =
+    "SELECT id, username, email, profile_picture, user_level, status FROM users WHERE id = ?";
+
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error("Database Error:", err);
+      return res.status(500).json({ error: "Database error occurred" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const user = results[0];
+
     // แปลงรูปโปรไฟล์เป็น Base64
     const profilePictureBase64 = user.profile_picture
-    ? `data:image/jpeg;base64,${user.profile_picture.toString("base64")}`
-    : null;
+      ? `data:image/jpeg;base64,${user.profile_picture.toString("base64")}`
+      : null;
 
     res.json({
       id: user.id,
@@ -234,7 +229,7 @@ exports.getCurrentUser = (req, res) => {
 exports.getUserProfilePicture = (req, res) => {
   const userId = req.params.id;
   const query = "SELECT profile_picture FROM users WHERE id = ?";
-  
+
   db.query(query, [userId], (err, results) => {
     if (err) {
       console.error("Database Error:", err);
@@ -244,12 +239,12 @@ exports.getUserProfilePicture = (req, res) => {
     if (results.length === 0 || !results[0].profile_picture) {
       return res.status(404).json({ error: "Profile picture not found" });
     }
-    
+
     // แปลง Buffer เป็น Base64
     const base64Image = `data:image/jpeg;base64,${results[0].profile_picture.toString(
       "base64"
     )}`;
-    
+
     // ส่ง Base64 กลับไป
     res.json({ profile_picture: base64Image });
   });
@@ -257,7 +252,8 @@ exports.getUserProfilePicture = (req, res) => {
 
 // Get all users
 exports.getAllusers = (req, res) => {
-  const query = "SELECT id, username, email, user_level, status, profile_picture FROM users";
+  const query =
+    "SELECT id, username, email, user_level, status, profile_picture FROM users";
 
   db.query(query, (err, results) => {
     if (err) {
@@ -266,12 +262,12 @@ exports.getAllusers = (req, res) => {
     }
 
     // แปลง profile_picture จาก Buffer เป็น Base64 พร้อม Prefix
-    const usersWithPictures = results.map(user => {
+    const usersWithPictures = results.map((user) => {
       return {
         ...user,
         profile_picture: user.profile_picture
           ? `data:image/jpeg;base64,${user.profile_picture.toString("base64")}`
-          : null
+          : null,
       };
     });
 
@@ -282,23 +278,27 @@ exports.getAllusers = (req, res) => {
 // Update user details
 exports.updateUser = (req, res) => {
   const userId = req.params.id;
-  const { username, email, userLevel, status } = req.body;
-  const query =
-  "UPDATE users SET username = ?, email = ?, user_level = ?, status = ? WHERE id = ?";
-  
+  const { username, email, user_level, status } = req.body;
+  const profilePicture = req.file ? req.file.buffer : null;
+
+  const query = `
+    UPDATE users 
+    SET username = ?, email = ?, user_level = ?, status = ?, profile_picture = ?
+    WHERE id = ?`;
+
   db.query(
     query,
-    [username, email, userLevel, status, userId],
+    [username, email, user_level, status, profilePicture, userId],
     (err, result) => {
       if (err) {
         console.error("Database Error:", err);
-        return res.status(500).json({ error: "Database error occurred" });
+        return res.status(500).json({ error: "Database update failed" });
       }
-      
+
       if (result.affectedRows === 0) {
         return res.status(404).json({ error: "User not found" });
       }
-      
+
       res.json({ message: "User updated successfully!" });
     }
   );
@@ -308,7 +308,7 @@ exports.updateUser = (req, res) => {
 exports.deleteUser = (req, res) => {
   const userId = req.params.id;
   const query = "DELETE FROM users WHERE id = ?";
-  
+
   db.query(query, [userId], (err, result) => {
     if (err) {
       console.error("Database Error:", err);
@@ -318,7 +318,7 @@ exports.deleteUser = (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "User not found" });
     }
-    
+
     res.json({ message: "User deleted successfully!" });
   });
 };
@@ -350,11 +350,19 @@ exports.getUserProfilePicture = (req, res) => {
 
 // ดึงข้อมูลผู้ใช้ รวมถึงโปรไฟล์รูปภาพ
 exports.getUserById = (req, res) => {
-  const userId = req.params.id;
-  const query = "SELECT username, email, user_level, status, profile_picture FROM users WHERE id = ?";
+  const userId = req.params.id; // ใช้ id จากพารามิเตอร์
+  const query =
+    "SELECT id, username, email, user_level, status, profile_picture FROM users WHERE id = ?";
+
   db.query(query, [userId], (err, results) => {
-    if (err) return res.status(500).json({ error: "Database error occurred" });
-    if (results.length === 0) return res.status(404).json({ error: "User not found" });
+    if (err) {
+      console.error("Database Error:", err);
+      return res.status(500).json({ error: "Database error occurred" });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
     const user = results[0];
     const profilePictureBase64 = user.profile_picture
@@ -362,6 +370,7 @@ exports.getUserById = (req, res) => {
       : null;
 
     res.json({
+      id: user.id,
       username: user.username,
       email: user.email,
       user_level: user.user_level,
@@ -377,17 +386,28 @@ exports.updateUserWithImage = (req, res) => {
   const { username, email, user_level, status } = req.body;
   const profilePicture = req.file ? req.file.buffer : null;
 
-  const query = `
-    UPDATE users 
-    SET username = ?, email = ?, user_level = ?, status = ?, profile_picture = ?
-    WHERE id = ?`;
+  const query = profilePicture
+    ? `UPDATE users 
+       SET username = ?, email = ?, user_level = ?, status = ?, profile_picture = ?
+       WHERE id = ?`
+    : `UPDATE users 
+       SET username = ?, email = ?, user_level = ?, status = ?
+       WHERE id = ?`;
 
-  db.query(
-    query,
-    [username, email, user_level, status, profilePicture, userId],
-    (err, result) => {
-      if (err) return res.status(500).json({ error: "Database update failed" });
-      res.json({ message: "User updated successfully" });
+  const params = profilePicture
+    ? [username, email, user_level, status, profilePicture, userId]
+    : [username, email, user_level, status, userId];
+
+  db.query(query, params, (err, result) => {
+    if (err) {
+      console.error("Database Error:", err);
+      return res.status(500).json({ error: "Database update failed" });
     }
-  );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ message: "User updated successfully!" });
+  });
 };
